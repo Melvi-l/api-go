@@ -6,8 +6,10 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"os"
 
 	_ "github.com/go-sql-driver/mysql"
+	"github.com/joho/godotenv"
 )
 
 type Comment struct {
@@ -19,9 +21,22 @@ type Comment struct {
 
 var db *sql.DB
 
+func buildDataSourceName() string {
+	err := godotenv.Load()
+	if err != nil {
+		log.Fatal("Error loading .env file")
+	}
+	dbUser := os.Getenv("DB_USER")
+	dbPassword := os.Getenv("DB_PASSWORD")
+	dbHost := os.Getenv("DB_HOST")
+	dbPort := os.Getenv("DB_PORT")
+	dbName := os.Getenv("DB_NAME")
+	return fmt.Sprintf("%s:%s@tcp(%s:%s)/%s", dbUser, dbPassword, dbHost, dbPort, dbName)
+}
+
 func connectToDatabase() {
 	var err error
-	db, err = sql.Open("mysql", "root:test1234@tcp(localhost:3306)/mydb")
+	db, err = sql.Open("mysql", buildDataSourceName())
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -89,7 +104,9 @@ func getCommentsHandler(w http.ResponseWriter, r *http.Request) {
 	// Serialized to JSON
 	jsonData, err := json.Marshal(comments)
 	if err != nil {
+		http.Error(w, "Server error", http.StatusInternalServerError)
 		fmt.Println(err.Error())
+        return
 	}
 
 	w.Header().Set("Content-Type", "application/json")
@@ -136,8 +153,6 @@ func postCommentsHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	fmt.Printf("Amazing %s", c.Content)
-
 	// Insert in db
 	_, err = db.Exec("INSERT INTO comments (username, content) VALUES (?, ?)", c.Username, c.Content)
 
@@ -171,7 +186,7 @@ func deleteComments(w http.ResponseWriter, r *http.Request) {
 	// Parse path value
 	id := r.PathValue("id")
 
-    // Query db
+	// Query db
 	_, err := db.Exec("DELETE FROM comments WHERE id = ?", id)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
