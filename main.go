@@ -17,8 +17,11 @@ type Comment struct {
 	CreatedAt []uint8 `json:"created_at"`
 }
 
-func connectToDatabase() *sql.DB {
-	db, err := sql.Open("mysql", "root:test1234@tcp(localhost:3306)/mydb")
+var db *sql.DB
+
+func connectToDatabase() {
+	var err error
+	db, err = sql.Open("mysql", "root:test1234@tcp(localhost:3306)/mydb")
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -27,12 +30,13 @@ func connectToDatabase() *sql.DB {
 		log.Fatal(err)
 	}
 	fmt.Println("Database connexion succeed !")
-	return db
+	return
 }
+
 func main() {
 	fmt.Println("Hello, Go server API !")
 
-	db := connectToDatabase()
+	connectToDatabase()
 	defer db.Close()
 
 	router := http.NewServeMux()
@@ -42,23 +46,9 @@ func main() {
 
 	commentRouter := http.NewServeMux()
 	router.Handle("/comments/", http.StripPrefix("/comments", commentRouter))
-	commentRouter.HandleFunc("GET /", func(w http.ResponseWriter, r *http.Request) {
-		comments, err := findAllComment(db)
-		if err != nil {
-			fmt.Println(err.Error())
-		}
-		rawJsonData, err := commentsToJson(comments)
-          w.Header().Set("Content-Type", "application/json")
-  w.WriteHeader(http.StatusOK)
-  w.Write(rawJsonData)
-	})
-	commentRouter.HandleFunc("POST /", func(w http.ResponseWriter, r *http.Request) {
-		fmt.Fprintf(w, "post a new comment")
-	})
-	commentRouter.HandleFunc("GET /{id}", func(w http.ResponseWriter, r *http.Request) {
-		id := r.PathValue("id")
-		fmt.Fprintf(w, "return the comment with id=%s", id)
-	})
+	commentRouter.HandleFunc("GET /", getCommentsHandler)
+	commentRouter.HandleFunc("POST /", postCommentsHandler)
+	commentRouter.HandleFunc("GET /{id}", getCommentsByIdHandler)
 
 	err := http.ListenAndServe("localhost:8080", router)
 	if err != nil {
@@ -66,33 +56,93 @@ func main() {
 	}
 }
 
-func findAllComment(db *sql.DB) ([]Comment, error) {
+func getCommentsHandler(w http.ResponseWriter, r *http.Request) {
+	// Query db
 	rows, err := db.Query("SELECT * FROM comment")
 	if err != nil {
-		fmt.Println(err.Error())
+		log.Printf("Error querying database: %v", err)
+		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
+		return
 	}
 	defer rows.Close()
 
+	// Parse rows
 	var comments []Comment
 	for rows.Next() {
 		var c Comment
 		err = rows.Scan(&c.ID, &c.Username, &c.Content, &c.CreatedAt)
 		if err != nil {
-			return nil, err
+			log.Printf("Error scanning row: %v", err)
+			http.Error(w, "Internal Server Error", http.StatusInternalServerError)
+			return
 		}
 		comments = append(comments, c)
 	}
-	err = rows.Err()
-	if err != nil {
-		return nil, err
+	if err = rows.Err(); err != nil {
+		log.Printf("Error iterating rows: %v", err)
+		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
+		return
 	}
-	return comments, nil
-}
 
-func commentsToJson(comments []Comment) ([]byte, error) {
+	// Serialized to JSON
 	jsonData, err := json.Marshal(comments)
 	if err != nil {
-		return nil, err
+		fmt.Println(err.Error())
 	}
-	return jsonData, nil
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	w.Write(jsonData)
+}
+
+func postCommentsHandler(w http.ResponseWriter, r *http.Request) {
+	// Parse request body
+	var c Comment
+	err := json.NewDecoder(r.Body).Decode(&c)
+
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	fmt.Printf("Amazing %s", c.Content)
+
+	// Insert in db
+	_, err = db.Exec("INSERT INTO comment (username, content) VALUES (?, ?)", c.Username, c.Content)
+
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	w.WriteHeader(http.StatusCreated)
+}
+
+func getCommentsByIdHandler(w http.ResponseWriter, r *http.Request) {
+	// Parse path value
+	id := r.PathValue("id")
+
+	// Query db
+	c := Comment{}
+	err := db.QueryRow("SELECT id, username, content, created_at FROM comment WHERE id=?", id).Scan(&c.ID, &c.Username, &c.Content, &c.CreatedAt)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			http.NotFound(w, r)
+			return
+		}
+		log.Printf("Error when getting comment: %v", err)
+		http.Error(w, "Server error", http.StatusInternalServerError)
+		return
+	}
+
+	// Serialized to JSON
+	jsonResponse, err := json.Marshal(c)
+	if err != nil {
+		log.Printf("Error when marshaling JSON: %v", err)
+		http.Error(w, "Server error", http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.Write(jsonResponse)
 }
