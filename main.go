@@ -47,8 +47,10 @@ func main() {
 	commentRouter := http.NewServeMux()
 	router.Handle("/comments/", http.StripPrefix("/comments", commentRouter))
 	commentRouter.HandleFunc("GET /", getCommentsHandler)
-	commentRouter.HandleFunc("POST /", postCommentsHandler)
 	commentRouter.HandleFunc("GET /{id}", getCommentsByIdHandler)
+	commentRouter.HandleFunc("POST /", postCommentsHandler)
+	commentRouter.HandleFunc("PUT /{id}", putCommentsByIdHandler)
+	commentRouter.HandleFunc("DELETE /{id}", deleteComments)
 
 	err := http.ListenAndServe("localhost:8080", router)
 	if err != nil {
@@ -58,7 +60,7 @@ func main() {
 
 func getCommentsHandler(w http.ResponseWriter, r *http.Request) {
 	// Query db
-	rows, err := db.Query("SELECT * FROM comment")
+	rows, err := db.Query("SELECT * FROM comments")
 	if err != nil {
 		log.Printf("Error querying database: %v", err)
 		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
@@ -95,36 +97,13 @@ func getCommentsHandler(w http.ResponseWriter, r *http.Request) {
 	w.Write(jsonData)
 }
 
-func postCommentsHandler(w http.ResponseWriter, r *http.Request) {
-	// Parse request body
-	var c Comment
-	err := json.NewDecoder(r.Body).Decode(&c)
-
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
-		return
-	}
-
-	fmt.Printf("Amazing %s", c.Content)
-
-	// Insert in db
-	_, err = db.Exec("INSERT INTO comment (username, content) VALUES (?, ?)", c.Username, c.Content)
-
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
-
-	w.WriteHeader(http.StatusCreated)
-}
-
 func getCommentsByIdHandler(w http.ResponseWriter, r *http.Request) {
 	// Parse path value
 	id := r.PathValue("id")
 
 	// Query db
 	c := Comment{}
-	err := db.QueryRow("SELECT id, username, content, created_at FROM comment WHERE id=?", id).Scan(&c.ID, &c.Username, &c.Content, &c.CreatedAt)
+	err := db.QueryRow("SELECT id, username, content, created_at FROM comments WHERE id=?", id).Scan(&c.ID, &c.Username, &c.Content, &c.CreatedAt)
 	if err != nil {
 		if err == sql.ErrNoRows {
 			http.NotFound(w, r)
@@ -145,4 +124,59 @@ func getCommentsByIdHandler(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Type", "application/json")
 	w.Write(jsonResponse)
+}
+
+func postCommentsHandler(w http.ResponseWriter, r *http.Request) {
+	// Parse request body
+	var c Comment
+	err := json.NewDecoder(r.Body).Decode(&c)
+
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	fmt.Printf("Amazing %s", c.Content)
+
+	// Insert in db
+	_, err = db.Exec("INSERT INTO comments (username, content) VALUES (?, ?)", c.Username, c.Content)
+
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	w.WriteHeader(http.StatusCreated)
+}
+
+func putCommentsByIdHandler(w http.ResponseWriter, r *http.Request) {
+	// Parse path value
+	id := r.PathValue("id")
+
+	// Parse request body
+	var c Comment
+	err := json.NewDecoder(r.Body).Decode(&c)
+
+	// Query db
+	_, err = db.Exec("UPDATE comments SET content = ? WHERE id = ?", c.Content, id)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	w.WriteHeader(http.StatusOK)
+}
+
+func deleteComments(w http.ResponseWriter, r *http.Request) {
+	// Parse path value
+	id := r.PathValue("id")
+
+    // Query db
+	_, err := db.Exec("DELETE FROM comments WHERE id = ?", id)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	w.WriteHeader(http.StatusOK)
 }
