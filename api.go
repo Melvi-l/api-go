@@ -65,7 +65,7 @@ func main() {
 	commentRouter.HandleFunc("GET /{id}", getCommentsByIdHandler)
 	commentRouter.HandleFunc("POST /", postCommentsHandler)
 	commentRouter.HandleFunc("PUT /{id}", putCommentsByIdHandler)
-	commentRouter.HandleFunc("DELETE /{id}", deleteComments)
+	commentRouter.HandleFunc("DELETE /{id}", deleteCommentsByIdHandler)
 
 	err := http.ListenAndServe("localhost:8080", router)
 	if err != nil {
@@ -106,7 +106,7 @@ func getCommentsHandler(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		http.Error(w, "Server error", http.StatusInternalServerError)
 		fmt.Println(err.Error())
-        return
+		return
 	}
 
 	w.Header().Set("Content-Type", "application/json")
@@ -171,12 +171,16 @@ func putCommentsByIdHandler(w http.ResponseWriter, r *http.Request) {
 	// Parse request body
 	var c Comment
 	err := json.NewDecoder(r.Body).Decode(&c)
+	if err != nil {
+		log.Printf("Error when marshaling JSON: %v", err)
+		http.Error(w, "Server error", http.StatusInternalServerError)
+		return
+	}
 
 	// Query db
-    fmt.Printf("Querying.\nId:%s\nComment:%s", id, c.Content)
 	_, err = db.Exec("UPDATE comments SET content = ? WHERE id = ?", c.Content, id)
 	if err != nil {
-		fmt.Println(err.Error())
+		fmt.Println("Error when querying the database: " + err.Error())
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
@@ -184,14 +188,14 @@ func putCommentsByIdHandler(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusOK)
 }
 
-func deleteComments(w http.ResponseWriter, r *http.Request) {
+func deleteCommentsByIdHandler(w http.ResponseWriter, r *http.Request) {
 	// Parse path value
 	id := r.PathValue("id")
 
 	// Query db
 	_, err := db.Exec("DELETE FROM comments WHERE id = ?", id)
 	if err != nil {
-		fmt.Println(err.Error())
+		fmt.Println("Error when querying the database: " + err.Error())
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
