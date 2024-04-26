@@ -23,7 +23,7 @@ import (
 func TestAPI(t *testing.T) {
 	err := godotenv.Load()
 	if err != nil {
-		log.Fatal("Error loading .env file")
+		fmt.Println("Error loading .env file: " + err.Error())
 	}
 
 	ctx := context.Background()
@@ -85,8 +85,8 @@ func TestAPI(t *testing.T) {
 
 		assert.Equal(t, http.StatusOK, response.StatusCode, "Response should be OK")
 
-        body, err := io.ReadAll(response.Body)
-        assert.NoError(t, err, "Response body should be readable")
+		body, err := io.ReadAll(response.Body)
+		assert.NoError(t, err, "Response body should be readable")
 
 		var c Comment
 		err = json.Unmarshal(body, &c)

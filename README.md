@@ -20,10 +20,10 @@
 
 ## Env variable
 ```properties
-MYSQL_USER=
 MYSQL_DATABASE=
-MYSQL_PASSWORD=
 MYSQL_ROOT_PASSWORD=
+MYSQL_USER=
+MYSQL_PASSWORD=
 MYSQL_HOST=
 MYSQL_PORT=
 ```
@@ -31,3 +31,4 @@ MYSQL_PORT=
 # TODO
 - [x] Add env variable dynamic configuration
 - [x] Add test with [TestContainer](https://golang.testcontainers.org/)
+- [x] Add a github action build and test workflows
