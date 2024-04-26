@@ -26,11 +26,11 @@ func buildDataSourceName() string {
 	if err != nil {
 		log.Fatal("Error loading .env file")
 	}
-	dbUser := os.Getenv("DB_USER")
-	dbPassword := os.Getenv("DB_PASSWORD")
-	dbHost := os.Getenv("DB_HOST")
-	dbPort := os.Getenv("DB_PORT")
-	dbName := os.Getenv("DB_NAME")
+	dbUser := os.Getenv("MYSQL_USER")
+	dbPassword := os.Getenv("MYSQL_PASSWORD")
+	dbHost := os.Getenv("MYSQL_HOST")
+	dbPort := os.Getenv("MYSQL_PORT")
+	dbName := os.Getenv("MYSQL_DATABASE")
 	return fmt.Sprintf("%s:%s@tcp(%s:%s)/%s", dbUser, dbPassword, dbHost, dbPort, dbName)
 }
 
@@ -173,8 +173,10 @@ func putCommentsByIdHandler(w http.ResponseWriter, r *http.Request) {
 	err := json.NewDecoder(r.Body).Decode(&c)
 
 	// Query db
+    fmt.Printf("Querying.\nId:%s\nComment:%s", id, c.Content)
 	_, err = db.Exec("UPDATE comments SET content = ? WHERE id = ?", c.Content, id)
 	if err != nil {
+		fmt.Println(err.Error())
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
@@ -189,6 +191,7 @@ func deleteComments(w http.ResponseWriter, r *http.Request) {
 	// Query db
 	_, err := db.Exec("DELETE FROM comments WHERE id = ?", id)
 	if err != nil {
+		fmt.Println(err.Error())
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
