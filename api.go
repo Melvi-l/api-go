@@ -22,9 +22,9 @@ type Comment struct {
 var db *sql.DB
 
 func buildDataSourceName() string {
-	err := godotenv.Load()
+	err := godotenv.Load(".env.dev") // in production the environment variable is used instead
 	if err != nil {
-		log.Fatal("Error loading .env file")
+		fmt.Println("Error loading .env file. Using environment variable instead.")
 	}
 	dbUser := os.Getenv("MYSQL_USER")
 	dbPassword := os.Getenv("MYSQL_PASSWORD")
@@ -36,7 +36,9 @@ func buildDataSourceName() string {
 
 func connectToDatabase() {
 	var err error
-	db, err = sql.Open("mysql", buildDataSourceName())
+    dataSourceName := buildDataSourceName()
+    fmt.Println(dataSourceName)
+	db, err = sql.Open("mysql", dataSourceName)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -67,7 +69,7 @@ func main() {
 	commentRouter.HandleFunc("PUT /{id}", putCommentsByIdHandler)
 	commentRouter.HandleFunc("DELETE /{id}", deleteCommentsByIdHandler)
 
-	err := http.ListenAndServe("localhost:8080", router)
+	err := http.ListenAndServe(":8080", router)
 	if err != nil {
 		fmt.Println(err.Error())
 	}

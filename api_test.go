@@ -21,7 +21,7 @@ import (
 )
 
 func TestAPI(t *testing.T) {
-	err := godotenv.Load()
+	err := godotenv.Load(".env.dev")
 	if err != nil {
 		fmt.Println("Error loading .env file: " + err.Error())
 	}
@@ -35,7 +35,7 @@ func TestAPI(t *testing.T) {
 		mysql.WithDatabase(dbName),
 		mysql.WithUsername("root"),
 		mysql.WithPassword("test1234"),
-		mysql.WithScripts("schema.sql"),
+		mysql.WithScripts("db/test_schema.sql"),
 	)
 	if err != nil {
 		log.Fatalf("failed to start container: %s", err)
